@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cw105-36"
+version = "0.1.0"
+description = "Exact computer-assisted proof of nonexistence for CGW(35,12;6) and CW(105,36)"
+requires-python = ">=3.11"
+dependencies = ["numpy>=2"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]

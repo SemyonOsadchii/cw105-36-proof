@@ -1,0 +1,115 @@
+name: exact-publication-validation
+
+on:
+  workflow_dispatch:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-proof:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install exact and paper dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            latexmk texlive-latex-base texlive-latex-recommended
+          python -m pip install -e '.[test]'
+      - name: Reproduce and audit the publication
+        env:
+          CW105_ARTIFACT_DIR: ${{ runner.temp }}/cw105-proof
+        run: ./run_all.sh
+      - name: Confirm the tracked tree is unchanged
+        run: git diff --exit-code
+      - uses: actions/upload-artifact@v4
+        with:
+          name: exact-proof-${{ github.sha }}
+          path: ${{ runner.temp }}/cw105-proof
+          if-no-files-found: error
+          retention-days: 90
+
+  cas-validation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install GAP 4.12.1
+        uses: gap-actions/setup-gap@v3
+        with:
+          gap-version: "4.12.1"
+      - name: Run SageMath 10.9 and GAP independently
+        env:
+          CAS_OUT: ${{ runner.temp }}/cw105-cas
+          SAGE_IMAGE: sagemath/sagemath:10.9@sha256:e068670ae5863b54b2550e72437ec637b0283acb0dc712c8584c124dbf44e667
+        run: |
+          set -euo pipefail
+          mkdir -p "$CAS_OUT/sage" "$CAS_OUT/gap"
+          cp validation/sage/validator.sage "$CAS_OUT/sage/"
+          cp validation/gap/validator.g "$CAS_OUT/gap/"
+          gap -q -c 'Print(GAPInfo.Version, "\n"); QUIT;' \
+            > "$CAS_OUT/gap-version.txt"
+          docker pull "$SAGE_IMAGE"
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            --entrypoint /usr/bin/env \
+            -e HOME=/tmp \
+            -e DOT_SAGE=/tmp/.sage \
+            -v "$CAS_OUT:/out" \
+            -w /out/sage \
+            "$SAGE_IMAGE" \
+            sage --version > "$CAS_OUT/sage-version.txt"
+          /usr/bin/time -v -o "$CAS_OUT/sage-time.txt" \
+            docker run --rm \
+              --user "$(id -u):$(id -g)" \
+              --entrypoint /usr/bin/env \
+              -e HOME=/tmp \
+              -e DOT_SAGE=/tmp/.sage \
+              -v "$CAS_OUT:/out" \
+              -w /out/sage \
+              "$SAGE_IMAGE" \
+              sage validator.sage \
+              > "$CAS_OUT/sage-stdout.txt" \
+              2> "$CAS_OUT/sage-stderr.txt"
+          (
+            cd "$CAS_OUT/gap"
+            /usr/bin/time -v -o ../gap-time.txt \
+              gap -q validator.g \
+              > ../gap-stdout.txt \
+              2> ../gap-stderr.txt
+          )
+          test ! -s "$CAS_OUT/sage-stderr.txt"
+          test ! -s "$CAS_OUT/gap-stderr.txt"
+      - name: Reconcile independently generated CAS outputs
+        env:
+          CAS_OUT: ${{ runner.temp }}/cw105-cas
+        run: |
+          python validation/reconcile_cas.py \
+            --sage-result "$CAS_OUT/sage/result.json" \
+            --sage-supports "$CAS_OUT/sage/support-masks.txt" \
+            --gap-result "$CAS_OUT/gap/result.json" \
+            --gap-supports "$CAS_OUT/gap/support-masks.txt" \
+            --certificate data/mod3_weight12_support_masks.txt \
+            --output "$CAS_OUT/reconciliation.json"
+          (
+            cd "$CAS_OUT"
+            find . -type f ! -name manifest.sha256 -print0 \
+              | sort -z | xargs -0 sha256sum > manifest.sha256
+            sha256sum -c manifest.sha256
+          )
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cas-validation-${{ github.sha }}
+          path: ${{ runner.temp }}/cw105-cas
+          if-no-files-found: error
+          retention-days: 90
