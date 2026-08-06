@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use this proof repository, please cite the accompanying manuscript."
+title: "Fibre-character and finite-field obstructions for circulant weighing matrices"
+type: software
+version: 1.0.0
+date-released: 2026-08-06
+authors:
+  - family-names: Osadchii
+    given-names: Semyon
+    email: Sposadchii@gmail.com
+repository-code: "https://github.com/SemyonOsadchii/cw105-36-proof"
+license: MIT
+keywords:
+  - circulant weighing matrix
+  - generalized weighing matrix
+  - finite fields
+  - computer-assisted proof
+preferred-citation:
+  type: article
+  title: "Fibre-character and finite-field obstructions for circulant weighing matrices"
+  authors:
+    - family-names: Osadchii
+      given-names: Semyon
+  year: 2026

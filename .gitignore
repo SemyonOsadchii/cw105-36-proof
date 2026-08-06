@@ -1,0 +1,26 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+validation-artifacts/
+
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+
+# Local assistant state and private workspace instructions.
+.codex/
+.claude/
+.cursor/
+.continue/
+.aider*
+docs/superpowers/
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+WORKSPACE.md
